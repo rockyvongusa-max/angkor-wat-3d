@@ -22,19 +22,17 @@
     <button id="btn-night">Night</button>
     <button id="btn-tour">Tour</button>
   </div>
-  <div id="hint">Mouse drag = rotate · scroll = zoom · right drag = pan</div>
+  <div id="hint">Left drag = rotate · scroll = zoom · right drag = pan</div>
 </div>
 <div id="debug">Initializing...</div>
 
 <script src="https://unpkg.com/three@0.150.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.150.0/examples/js/controls/OrbitControls.js"></script>
 
 <script>
 (function() {
   const debug = document.getElementById('debug');
   try {
     if (typeof THREE === 'undefined') throw new Error('THREE not loaded');
-    debug.textContent = 'Three.js loaded: ' + THREE.REVISION;
 
     const canvas = document.getElementById('app');
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -51,10 +49,15 @@
     const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 2000);
     camera.position.set(140, 90, 180);
 
-    const controls = new THREE.OrbitControls(camera, canvas);
-    controls.target.set(0, 6, 0);
-    controls.maxPolarAngle = Math.PI / 2.05;
-    controls.enableDamping = true;
+    const controls = {
+      spherical: new THREE.Spherical(180, Math.PI / 3, 40),
+      target: new THREE.Vector3(0, 6, 0),
+      panOffset: new THREE.Vector3(),
+      enabled: true,
+    };
+    controls.spherical.radius = 180;
+    controls.spherical.phi = Math.PI / 3;
+    controls.spherical.theta = Math.PI / 4;
 
     const stone = new THREE.MeshStandardMaterial({ color: 0xe8d7a3, roughness: 0.85, metalness: 0.05 });
     const darkStone = new THREE.MeshStandardMaterial({ color: 0xb8a47a, roughness: 0.9, metalness: 0.05 });
@@ -301,14 +304,13 @@
 
     function flyTo(i) {
       const v = waypoints[i % waypoints.length];
-      controls.enabled = false;
       targetPos = v.pos.clone();
       targetLook = v.target.clone();
     }
     document.getElementById('btn-tour').addEventListener('click', function() {
       tourOn = !tourOn;
       document.getElementById('btn-tour').textContent = tourOn ? 'Stop Tour' : 'Tour';
-      if (tourOn) runTour(); else { controls.enabled = true; targetPos = null; targetLook = null; }
+      if (tourOn) runTour(); else { targetPos = null; targetLook = null; }
     });
     function runTour() {
       if (!tourOn) return;
@@ -354,6 +356,68 @@
 
     const clock = new THREE.Clock();
     const tmpVec = new THREE.Vector3();
+
+    // Inline orbit controls to avoid external OrbitControls dependency
+    let isMouseDown = false;
+    let mouseButton = -1;
+    let prevMouse = { x: 0, y: 0 };
+    let targetSpherical = new THREE.Spherical(180, Math.PI / 3, 0);
+    let targetPan = controls.target.clone();
+    let isDragging = false;
+    const PAN_SPEED = 0.05;
+    const ZOOM_SPEED = 1.08;
+
+    canvas.addEventListener('mousedown', function(e) {
+      isMouseDown = true;
+      mouseButton = e.button;
+      prevMouse.x = e.clientX;
+      prevMouse.y = e.clientY;
+      isDragging = false;
+    });
+
+    window.addEventListener('mouseup', function() {
+      isMouseDown = false;
+      mouseButton = -1;
+      isDragging = false;
+    });
+
+    window.addEventListener('mousemove', function(e) {
+      if (!isMouseDown) return;
+      const dx = e.clientX - prevMouse.x;
+      const dy = e.clientY - prevMouse.y;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) isDragging = true;
+      if (mouseButton === 0) {
+        targetSpherical.theta -= dx * 0.005;
+        targetSpherical.phi -= dy * 0.005;
+        targetSpherical.phi = Math.max(0.1, Math.min(Math.PI / 2.05, targetSpherical.phi));
+      } else if (mouseButton === 2) {
+        const offset = tmpVec.set(0, 0, 0);
+        offset.x = -dx * PAN_SPEED;
+        offset.y = dy * PAN_SPEED;
+        const panOffset = offset.applyQuaternion(camera.quaternion);
+        targetPan.add(panOffset);
+      }
+      prevMouse.x = e.clientX;
+      prevMouse.y = e.clientY;
+    });
+
+    canvas.addEventListener('wheel', function(e) {
+      targetSpherical.radius *= e.deltaY > 0 ? ZOOM_SPEED : 1 / ZOOM_SPEED;
+      targetSpherical.radius = Math.max(40, Math.min(500, targetSpherical.radius));
+    }, { passive: true });
+
+    canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    function updateCamera() {
+      controls.spherical.theta += (targetSpherical.theta - controls.spherical.theta) * 0.2;
+      controls.spherical.phi += (targetSpherical.phi - controls.spherical.phi) * 0.2;
+      controls.spherical.radius += (targetSpherical.radius - controls.spherical.radius) * 0.2;
+      controls.target.lerp(targetPan, 0.2);
+      const offset = new THREE.Vector3().setFromSpherical(controls.spherical);
+      camera.position.copy(controls.target).add(offset);
+      camera.lookAt(controls.target);
+    }
+
     function animate() {
       const t = clock.getElapsedTime();
       if (targetPos) {
@@ -362,14 +426,16 @@
         controls.target.copy(tmpVec);
         if (camera.position.distanceTo(targetPos) < 0.6) {
           targetPos = null;
-          controls.enabled = true;
         }
+      } else {
+        updateCamera();
       }
-      controls.update();
+      controls.enabled = true;
+
       lanterns.forEach(function(l, i) {
         l.glow += (Math.sin(t * 4 + i * 1.7) * 0.15 + Math.sin(t * 7 + i * 3.3) * 0.08 - l.glow) * 0.2;
         l.light.intensity = 0.7 + l.glow * 0.25;
-        lanternGlass.emissiveIntensity = night ? 3.5 + l.glow * 0.6 : 2.5;
+        lanternGlass.emissiveIntensity = nightMode ? 3.5 + l.glow * 0.6 : 2.5;
       });
       if (rain.visible) {
         const pos = rain.geometry.attributes.position.array;
@@ -384,6 +450,24 @@
       requestAnimationFrame(animate);
     }
 
+    let nightMode = false;
+    function setMode(mode) {
+      nightMode = mode === 'night';
+      sun.visible = !nightMode;
+      sunGlow.visible = !nightMode;
+      scene.background.set(nightMode ? 0x020511 : 0xa3c8ff);
+      scene.fog.color.set(nightMode ? 0x020511 : 0xa3c8ff);
+      moon.visible = nightMode;
+      moonGlow.visible = nightMode;
+      moonDirectional.visible = nightMode;
+      nightAmbient.visible = nightMode;
+      nightHemi.visible = nightMode;
+      stars.visible = nightMode;
+      rain.visible = nightMode;
+      lanternGlass.emissiveIntensity = nightMode ? 3.5 : 2.5;
+      renderer.toneMappingExposure = nightMode ? 0.45 : 1.0;
+    }
+
     window.addEventListener('resize', function() {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
@@ -391,7 +475,7 @@
     });
 
     debug.textContent = 'Starting render...';
-    requestAnimationFrame(animate);
+    animate();
   } catch (e) {
     debug.textContent = 'Error: ' + e.message;
     console.error(e);
