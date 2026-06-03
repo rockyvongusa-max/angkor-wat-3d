@@ -24,23 +24,14 @@
   <div id="hint">Mouse drag = rotate &middot; scroll = zoom &middot; right drag = pan</div>
 </div>
 
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-
 <script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 
 const canvas = document.getElementById('app');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
@@ -52,12 +43,11 @@ scene.fog = new THREE.Fog(0xa3c8ff, 80, 500);
 const camera = new THREE.PerspectiveCamera(50, innerWidth / innerHeight, 1, 2000);
 camera.position.set(140, 90, 180);
 
-const controls = new OrbitControls(camera, renderer.domElement);
+const controls = new OrbitControls(camera, canvas);
 controls.target.set(0, 6, 0);
 controls.maxPolarAngle = Math.PI / 2.05;
 controls.enableDamping = true;
 
-// Materials
 const stone = new THREE.MeshStandardMaterial({ color: 0xe8d7a3, roughness: 0.85, metalness: 0.05 });
 const darkStone = new THREE.MeshStandardMaterial({ color: 0xb8a47a, roughness: 0.9, metalness: 0.05 });
 const darkStoneDeep = new THREE.MeshStandardMaterial({ color: 0x7a6a48, roughness: 0.95, metalness: 0.05 });
@@ -66,14 +56,12 @@ const goldAccent = new THREE.MeshStandardMaterial({ color: 0xc8a84c, roughness: 
 const water = new THREE.MeshStandardMaterial({ color: 0x3d6d8f, roughness: 0.2, metalness: 0.1, transparent: true, opacity: 0.9 });
 const grass = new THREE.MeshStandardMaterial({ color: 0x6e9c4a, roughness: 1, metalness: 0 });
 const lotusMat = new THREE.MeshStandardMaterial({ color: 0xf2c4dc, roughness: 0.6, metalness: 0 });
-const lanternGlass = new THREE.MeshStandardMaterial({ color: 0xffe9b3, emissive: 0xffaa55, emissiveIntensity: 2.5, roughness: 0.2, transparent: true, opacity: 0.9 });
-const nightGlow = new THREE.MeshStandardMaterial({ color: 0xff4422, emissive: 0xff2200, emissiveIntensity: 3 });
+const nightGlowMat = new THREE.MeshStandardMaterial({ color: 0xff4422, emissive: 0xff2200, emissiveIntensity: 3 });
+let lanternGlass = new THREE.MeshStandardMaterial({ color: 0xffe9b3, emissive: 0xffaa55, emissiveIntensity: 2.5, roughness: 0.2, transparent: true, opacity: 0.9 });
 
-// Scene root
 const root = new THREE.Group();
 scene.add(root);
 
-// --- Ground & Lake ---
 const ground = new THREE.Mesh(new THREE.CylinderGeometry(220, 230, 20, 64), grass);
 ground.position.y = -12;
 root.add(ground);
@@ -82,7 +70,6 @@ const lake = new THREE.Mesh(new THREE.CylinderGeometry(110, 108, 18, 64), water)
 lake.position.y = -8;
 root.add(lake);
 
-// Lotus pads on lake surface
 for (let i = 0; i < 45; i++) {
   const angle = Math.random() * Math.PI * 2;
   const r = 30 + Math.random() * 70;
@@ -95,22 +82,20 @@ for (let i = 0; i < 45; i++) {
   root.add(pad);
 }
 
-// Path / causeway stone ridges
 function addCauseway(fromX, fromZ, toX, toZ) {
   const dx = toX - fromX;
   const dz = toZ - fromZ;
   const len = Math.sqrt(dx * dx + dz * dz);
-  const mesh = new THREE.Mesh(new THREE.BoxGeometry(6, 0.6, len), darkStone);
-  mesh.position.set((fromX + toX) / 2, -6, (fromZ + toZ) / 2);
-  mesh.rotation.y = Math.atan2(dx, dz);
-  root.add(mesh);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(6, 0.6, len), darkStone);
+  m.position.set((fromX + toX) / 2, -6, (fromZ + toZ) / 2);
+  m.rotation.y = Math.atan2(dx, dz);
+  root.add(m);
 }
 addCauseway(0, 115, 0, 45);
 addCauseway(15, 45, 55, 20);
 addCauseway(-15, 45, -55, 20);
 
-// --- Angkor Wat core layout (simplified but readable) ---
-function mesh(geo, mat, px=0, py=0, pz=0, rx=0, ry=0, rz=0) {
+function addMesh(geo, mat, px=0, py=0, pz=0, rx=0, ry=0, rz=0) {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(px, py, pz);
   m.rotation.set(rx, ry, rz);
@@ -120,36 +105,28 @@ function mesh(geo, mat, px=0, py=0, pz=0, rx=0, ry=0, rz=0) {
   return m;
 }
 
-// Outer rectangular gallery (20 x 18)
 const outerW = 100, outerD = 90, outerH = 10, wallT = 5;
-mesh(new THREE.BoxGeometry(outerW + wallT * 2, outerH, wallT), darkStone, 0, 5, -outerD / 2);
-mesh(new THREE.BoxGeometry(outerW + wallT * 2, outerH, wallT), darkStone, 0, 5, outerD / 2);
-mesh(new THREE.BoxGeometry(wallT, outerH, outerD), darkStone, -outerW / 2, 5, 0);
-mesh(new THREE.BoxGeometry(wallT, outerH, outerD), darkStone, outerW / 2, 5, 0);
+addMesh(new THREE.BoxGeometry(outerW + wallT * 2, outerH, wallT), darkStone, 0, 5, -outerD / 2);
+addMesh(new THREE.BoxGeometry(outerW + wallT * 2, outerH, wallT), darkStone, 0, 5, outerD / 2);
+addMesh(new THREE.BoxGeometry(wallT, outerH, outerD), darkStone, -outerW / 2, 5, 0);
+addMesh(new THREE.BoxGeometry(wallT, outerH, outerD), darkStone, outerW / 2, 5, 0);
 
-// Second gallery
 const midW = 72, midD = 60, midH = 11;
-mesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, -midW / 2, 5, -midD / 2);
-mesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, midW / 2, 5, -midD / 2);
-mesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, -midW / 2, 5, midD / 2);
-mesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, midW / 2, 5, midD / 2);
+addMesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, -midW / 2, 5, -midD / 2);
+addMesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, midW / 2, 5, -midD / 2);
+addMesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, -midW / 2, 5, midD / 2);
+addMesh(new THREE.BoxGeometry(wallT, midH, midD + wallT), darkStone, midW / 2, 5, midD / 2);
 
-// Third inner gallery
 const innerW = 44, innerD = 36, innerH = 13;
-mesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, -innerW / 2, 5, -innerD / 2);
-mesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, innerW / 2, 5, -innerD / 2);
-mesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, -innerW / 2, 5, innerD / 2);
-mesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, innerW / 2, 5, innerD / 2);
+addMesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, -innerW / 2, 5, -innerD / 2);
+addMesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, innerW / 2, 5, -innerD / 2);
+addMesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, -innerW / 2, 5, innerD / 2);
+addMesh(new THREE.BoxGeometry(wallT, innerH, innerD + wallT), darkStone, innerW / 2, 5, innerD / 2);
 
-// Elevated cruciform platform
-mesh(new THREE.BoxGeometry(34, 2.5, 26), darkStoneDeep, 0, 4, 0);
+addMesh(new THREE.BoxGeometry(34, 2.5, 26), darkStoneDeep, 0, 4, 0);
 
-// Five central towers on quadrangle
 const towerRadius = 6.5;
 const towerHeight = 26;
-const towerGeo = new THREE.CylinderGeometry(towerRadius - 0.6, towerRadius, towerHeight, 32);
-const drumGeo = new THREE.CylinderGeometry(8, 10, 6, 32);
-
 const towers = [
   { x: 0, z: 0, h: towerHeight + 4, r: towerRadius },
   { x: -18, z: -14, h: towerHeight, r: towerRadius },
@@ -158,28 +135,19 @@ const towers = [
   { x: 18, z: 14, h: towerHeight, r: towerRadius },
 ];
 towers.forEach(t => {
-  const tg = new THREE.CylinderGeometry(t.r - 0.75, t.r, t.h, 32);
-  const drum = new THREE.Mesh(drumGeo, stone);
+  addMesh(new THREE.CylinderGeometry(t.r - 0.75, t.r, t.h, 32), stone, t.x, 7.5 + t.h / 2 + 3, t.z);
+  const drum = new THREE.Mesh(new THREE.CylinderGeometry(8, 10, 6, 32), stone);
   drum.position.set(t.x, 7.5, t.z);
   root.add(drum);
-
-  const tower = new THREE.Mesh(tg, stone);
-  tower.position.set(t.x, 7.5 + t.h / 2 + 3, t.z);
-  root.add(tower);
-
-  // dome cap hemispheres
   const dome = new THREE.Mesh(new THREE.SphereGeometry(t.r * 1.15, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2), roofTile);
   dome.position.set(t.x, 7.5 + t.h + 3, t.z);
   root.add(dome);
-
-  // spire detail
   const spire = new THREE.Mesh(new THREE.ConeGeometry(t.r * 0.5, 4.5, 8), goldAccent);
   spire.position.set(t.x, 7.5 + t.h + 3 + 3.5, t.z);
   root.add(spire);
 });
 
-// Corners with temple gopura-like projections
-function gopura(px, pz, rotY) {
+function addGopura(px, pz, rotY) {
   const group = new THREE.Group();
   group.rotation.y = rotY;
   const base = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 8), darkStoneDeep);
@@ -195,16 +163,14 @@ function gopura(px, pz, rotY) {
   group.position.set(px, 0, pz);
   root.add(group);
 }
-gopura(-midW / 2 + 4, -midD / 2 - 2, Math.PI / 4);
-gopura(midW / 2 - 4, -midD / 2 - 2, -Math.PI / 4);
-gopura(-midW / 2 + 4, midD / 2 + 2, Math.PI * 3 / 4);
-gopura(midW / 2 - 4, midD / 2 + 2, -Math.PI * 3 / 4);
+addGopura(-midW / 2 + 4, -midD / 2 - 2, Math.PI / 4);
+addGopura(midW / 2 - 4, -midD / 2 - 2, -Math.PI / 4);
+addGopura(-midW / 2 + 4, midD / 2 + 2, Math.PI * 3 / 4);
+addGopura(midW / 2 - 4, midD / 2 + 2, -Math.PI * 3 / 4);
 
-// Raised central inner platform
-mesh(new THREE.BoxGeometry(24, 3, 18), stone, 0, 5, 0);
+addMesh(new THREE.BoxGeometry(24, 3, 18), stone, 0, 5, 0);
 
-// Library towers (square)
-function makeLibrary(px, pz) {
+function addLibrary(px, pz) {
   const group = new THREE.Group();
   const body = new THREE.Mesh(new THREE.BoxGeometry(7, 7, 7), darkStone);
   body.position.y = 3.5;
@@ -218,12 +184,11 @@ function makeLibrary(px, pz) {
   group.position.set(px, 0, pz);
   root.add(group);
 }
-makeLibrary(0, -midD / 2 - 9);
-makeLibrary(0, midD / 2 + 9);
-makeLibrary(-midW / 2 - 9, 0);
-makeLibrary(midW / 2 + 9, 0);
+addLibrary(0, -midD / 2 - 9);
+addLibrary(0, midD / 2 + 9);
+addLibrary(-midW / 2 - 9, 0);
+addLibrary(midW / 2 + 9, 0);
 
-// Entrance causeway pillars
 for (let s of [-1, 1]) {
   for (let i = 0; i < 8; i++) {
     const z = 45 + i * 8;
@@ -237,7 +202,6 @@ for (let s of [-1, 1]) {
   }
 }
 
-// --- Sun & Sky ---
 const sun = new THREE.Mesh(new THREE.SphereGeometry(12, 32, 32), new THREE.MeshBasicMaterial({ color: 0xfffa9c }));
 sun.position.set(220, 160, -180);
 scene.add(sun);
@@ -245,31 +209,19 @@ const sunGlow = new THREE.PointLight(0xfff2b5, 2.2, 450);
 sunGlow.position.copy(sun.position);
 scene.add(sunGlow);
 
-// --- Lighting ---
-const ambient = new THREE.AmbientLight(0xffffff, 0.55);
-scene.add(ambient);
-
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 const sunLight = new THREE.DirectionalLight(0xffffff, 1.7);
 sunLight.position.copy(sun.position);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.set(1024, 1024);
-sunLight.shadow.camera.near = 1;
-sunLight.shadow.camera.far = 800;
-sunLight.shadow.camera.left = -160;
-sunLight.shadow.camera.right = 160;
-sunLight.shadow.camera.top = 160;
-sunLight.shadow.camera.bottom = -160;
+Object.assign(sunLight.shadow.camera, { near: 1, far: 800, left: -160, right: 160, top: 160, bottom: -160 });
 sunLight.shadow.bias = -0.001;
 scene.add(sunLight);
-
-const hemi = new THREE.HemisphereLight(0x8cb3d9, 0x2a3c26, 0.45);
-scene.add(hemi);
-
+scene.add(new THREE.HemisphereLight(0x8cb3d9, 0x2a3c26, 0.45));
 const rim = new THREE.DirectionalLight(0xcfe4ff, 0.6);
 rim.position.set(-100, 60, 120);
 scene.add(rim);
 
-// --- Night setup ---
 const moonPosition = new THREE.Vector3(-200, 180, 160);
 const moon = new THREE.Mesh(new THREE.SphereGeometry(7, 32, 32), new THREE.MeshBasicMaterial({ color: 0xe8eeff }));
 moon.position.copy(moonPosition);
@@ -283,16 +235,13 @@ const moonDirectional = new THREE.DirectionalLight(0x9bb9ff, 0.7);
 moonDirectional.position.copy(moonPosition);
 moonDirectional.visible = false;
 scene.add(moonDirectional);
-
 const nightAmbient = new THREE.AmbientLight(0x0a1226, 1.2);
 nightAmbient.visible = false;
 scene.add(nightAmbient);
-
 const nightHemi = new THREE.HemisphereLight(0x0b1a36, 0x0d1a0d, 0.4);
 nightHemi.visible = false;
 scene.add(nightHemi);
 
-// Lanterns alongraised walkways
 const lanterns = [];
 function addLantern(x, y, z) {
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 2.2, 8), darkStone);
@@ -316,7 +265,6 @@ for (let i = -2; i <= 2; i++) {
   addLantern(0, 0, -outerD / 2 + 8 - i * 14);
 }
 
-// --- Stars (sphere env) ---
 const starGeo = new THREE.BufferGeometry();
 const starCount = 800;
 const starPos = new Float32Array(starCount * 3);
@@ -333,7 +281,6 @@ const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffff
 stars.visible = false;
 scene.add(stars);
 
-// Camera tour waypoints
 const waypoints = [
   { pos: new THREE.Vector3(150, 70, 180), target: new THREE.Vector3(0, 8, 0) },
   { pos: new THREE.Vector3(130, 45, 0), target: new THREE.Vector3(0, 12, 0) },
@@ -341,42 +288,27 @@ const waypoints = [
   { pos: new THREE.Vector3(170, 90, -30), target: new THREE.Vector3(0, 8, 0) },
 ];
 
-gsap = window.gsap || ((() => {
-  const lib = {};
-  lib.to = function () { return lib; };
-  lib.timeline = () => lib;
-  lib.onComplete = lib;
-  return lib;
-}))();
+let targetPos = null;
+let targetLook = null;
+let tourOn = false;
+let tourIndex = 0;
 
-let activeTween = null;
 function flyTo(i) {
   const v = waypoints[i % waypoints.length];
   controls.enabled = false;
-
-  if (activeTween && activeTween.kill) activeTween.kill();
-
-  const tl = gsap.timeline({
-    onComplete: () => { controls.enabled = true; }
-  });
-
-  const ease = { duration: 2.2, ease: 'power2.inOut' };
-  tl.to(camera.position, { ...v.pos, ...ease }, 0);
-  tl.to(controls.target, { ...v.target, ...ease }, 0);
+  targetPos = v.pos.clone();
+  targetLook = v.target.clone();
 }
-
-let tourOn = false;
-let tourIndex = 0;
 document.getElementById('btn-tour').addEventListener('click', () => {
   tourOn = !tourOn;
   document.getElementById('btn-tour').textContent = tourOn ? 'Stop Tour' : 'Tour';
-  if (tourOn) runTour(); else { activeTween && activeTween.kill(); controls.enabled = true; }
+  if (tourOn) runTour(); else { controls.enabled = true; targetPos = null; targetLook = null; }
 });
 function runTour() {
   if (!tourOn) return;
   flyTo(tourIndex);
   tourIndex++;
-  setTimeout(() => { flyTo(tourIndex); tourIndex++; }, 2800);
+  setTimeout(() => { if (tourOn) { flyTo(tourIndex); tourIndex++; } }, 2800);
 }
 
 document.getElementById('btn-day').addEventListener('click', () => setMode('day'));
@@ -397,11 +329,9 @@ function setMode(mode) {
   nightHemi.visible = night;
   stars.visible = night;
   lanternGlass.emissiveIntensity = night ? 3.5 : 2.5;
-  nightGlow.emissiveIntensity = night ? 4 : 2;
   renderer.toneMappingExposure = night ? 0.45 : 1.0;
 }
 
-// --- Raindrops at night for mood ---
 const rainCount = 600;
 const rainGeo = new THREE.BufferGeometry();
 const rainPositions = new Float32Array(rainCount * 3);
@@ -432,22 +362,28 @@ function setMode(mode) {
   renderer.toneMappingExposure = night ? 0.45 : 1.0;
 }
 
-// --- Animate ---
 const clock = new THREE.Clock();
+const tmpVec = new THREE.Vector3();
 function animate() {
   const t = clock.getElapsedTime();
-  const dt = clock.getDelta();
 
+  if (targetPos) {
+    camera.position.lerp(targetPos, 0.06);
+    tmpVec.copy(controls.target).lerp(targetLook, 0.06);
+    controls.target.copy(tmpVec);
+    if (camera.position.distanceTo(targetPos) < 0.6) {
+      targetPos = null;
+      controls.enabled = true;
+    }
+  }
   controls.update();
 
-  // subtle lantern flicker
   lanterns.forEach((l, i) => {
     l.glow += (Math.sin(t * 4 + i * 1.7) * 0.15 + Math.sin(t * 7 + i * 3.3) * 0.08 - l.glow) * 0.2;
     l.light.intensity = 0.7 + l.glow * 0.25;
     lanternGlass.emissiveIntensity = night ? 3.5 + l.glow * 0.6 : 2.5;
   });
 
-  // rain animation
   if (rain.visible) {
     const pos = rain.geometry.attributes.position.array;
     for (let i = 0; i < rainCount; i++) {
@@ -457,7 +393,6 @@ function animate() {
     rain.geometry.attributes.position.needsUpdate = true;
   }
 
-  // subtle sun pulse
   sun.scale.setScalar(1.02 + Math.sin(t * 0.3) * 0.02);
 
   renderer.render(scene, camera);
@@ -467,7 +402,7 @@ function animate() {
 window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, window.innerHeight);
+  renderer.setSize(innerWidth, innerHeight);
 });
 
 animate();
